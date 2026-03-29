@@ -282,6 +282,7 @@ font-family: ‘JetBrains Mono’, monospace;
 .pill-good { background-color: rgba(78,203,113,0.15); color: #4ecb71; }
 .pill-mid  { background-color: rgba(136,136,160,0.15); color: #8888a0; }
 .pill-bad  { background-color: rgba(224,85,85,0.15); color: #e05555; }
+.pill-purple { background-color: rgba(168,139,250,0.15); color: #a78bfa; }
 
 /* ── Charts ── */
 .chart-container {
@@ -451,6 +452,40 @@ text-overflow: ellipsis; white-space: nowrap;
       <button class="scale-btn" data-v="4">4</button>
       <button class="scale-btn" data-v="5">5</button>
     </div>
+  </div>
+  <div class="field">
+    <label>Paměť — kódování a vybavení</label>
+    <div class="scale" data-f="memory">
+      <button class="scale-btn" data-v="1">1</button>
+      <button class="scale-btn" data-v="2">2</button>
+      <button class="scale-btn" data-v="3">3</button>
+      <button class="scale-btn" data-v="4">4</button>
+      <button class="scale-btn" data-v="5">5</button>
+    </div>
+  </div>
+</div>
+
+<div class="form-card">
+  <div class="form-card-title">Vnímání & efekt</div>
+  <div class="field">
+    <label>Konverzace — co vnímám</label>
+    <div class="toggle-group" data-f="socialPerception">
+      <button class="toggle-btn" data-v="music">Hudba</button>
+      <button class="toggle-btn" data-v="content">Obsah</button>
+      <button class="toggle-btn" data-v="both">Obojí</button>
+    </div>
+  </div>
+  <div class="field">
+    <label>Stabilita efektu přes den</label>
+    <div class="toggle-group" data-f="fluctuations">
+      <button class="toggle-btn" data-v="smooth">Plynulý</button>
+      <button class="toggle-btn" data-v="mild">Mírné vlny</button>
+      <button class="toggle-btn" data-v="severe">Výrazné výkyvy</button>
+    </div>
+  </div>
+  <div class="field">
+    <label>Konec efektu — kdy fade-out</label>
+    <input type="time" id="f-effectEndTime" style="width:120px;">
   </div>
 </div>
 
@@ -738,10 +773,8 @@ function showSection(name) {
 
 /* ═══════════ FORM ═══════════ */
 function gv(field) {
-  // Check scale buttons (have s1-s5 class)
   var scaleEl = document.querySelector('[data-f="' + field + '"] .s1, [data-f="' + field + '"] .s2, [data-f="' + field + '"] .s3, [data-f="' + field + '"] .s4, [data-f="' + field + '"] .s5');
   if (scaleEl) return scaleEl.dataset.v;
-  // Check toggle/energy buttons (have sel class)
   var selEl = document.querySelector('[data-f="' + field + '"] .sel');
   if (selEl) return selEl.dataset.v;
   return null;
@@ -767,6 +800,7 @@ function resetForm() {
   document.getElementById('f-doseTime').value = '07:00';
   document.getElementById('f-firstMeal').value = '11:00';
   document.getElementById('f-heartRate').value = '';
+  document.getElementById('f-effectEndTime').value = '';
   document.getElementById('f-note').value = '';
 }
 
@@ -780,9 +814,10 @@ function loadFormForDate(date) {
   document.getElementById('f-doseTime').value = e.doseTime || '07:00';
   document.getElementById('f-firstMeal').value = e.firstMeal || '11:00';
   document.getElementById('f-heartRate').value = e.heartRate || '';
+  document.getElementById('f-effectEndTime').value = e.effectEndTime || '';
   document.getElementById('f-note').value = e.note || '';
 
-  var scaleFields = ['initiation', 'focus', 'emotionalReactivity'];
+  var scaleFields = ['initiation', 'focus', 'emotionalReactivity', 'memory'];
   for (var i = 0; i < scaleFields.length; i++) {
     var f = scaleFields[i];
     if (e[f]) {
@@ -791,7 +826,7 @@ function loadFormForDate(date) {
     }
   }
 
-  var toggleFields = ['hungerNoticed', 'tinnitus', 'rls', 'sleepOnset', 'nightWaking'];
+  var toggleFields = ['hungerNoticed', 'tinnitus', 'rls', 'sleepOnset', 'nightWaking', 'socialPerception', 'fluctuations'];
   for (var i = 0; i < toggleFields.length; i++) {
     var f = toggleFields[i];
     if (e[f]) {
@@ -819,6 +854,10 @@ function saveEntry() {
     initiation: parseInt(gv('initiation')) || null,
     focus: parseInt(gv('focus')) || null,
     emotionalReactivity: parseInt(gv('emotionalReactivity')) || null,
+    memory: parseInt(gv('memory')) || null,
+    socialPerception: gv('socialPerception'),
+    fluctuations: gv('fluctuations'),
+    effectEndTime: document.getElementById('f-effectEndTime').value || null,
     hungerNoticed: gv('hungerNoticed'),
     firstMeal: document.getElementById('f-firstMeal').value,
     heartRate: parseInt(document.getElementById('f-heartRate').value) || null,
@@ -954,7 +993,11 @@ function renderHistory() {
     if (e.initiation) pills += '<span class="pill ' + pc(e.initiation) + '">Init ' + e.initiation + '</span>';
     if (e.focus) pills += '<span class="pill ' + pc(e.focus) + '">Focus ' + e.focus + '</span>';
     if (e.emotionalReactivity) pills += '<span class="pill ' + pc(e.emotionalReactivity) + '">Emo ' + e.emotionalReactivity + '</span>';
+    if (e.memory) pills += '<span class="pill ' + pc(e.memory) + '">Mem ' + e.memory + '</span>';
+    if (e.socialPerception) { var spl = {music:'♪ Hudba',content:'◉ Obsah',both:'⚡ Obojí'}; pills += '<span class="pill pill-purple">' + (spl[e.socialPerception]||e.socialPerception) + '</span>'; }
+    if (e.fluctuations) { var fl = {smooth:'Plynulý',mild:'Vlny',severe:'Výkyvy'}; pills += '<span class="pill pill-mid">' + (fl[e.fluctuations]||e.fluctuations) + '</span>'; }
     if (e.heartRate) pills += '<span class="pill pill-dose">' + e.heartRate + 'bpm</span>';
+    if (e.effectEndTime) pills += '<span class="pill pill-mid">→' + e.effectEndTime + '</span>';
     html += '<div class="history-item">' +
       '<div class="history-top">' +
         '<span class="history-date">' + ds + '</span>' +
@@ -987,11 +1030,17 @@ function showDetail(date) {
   var sl = { easy: 'Lehké', normal: 'Normální', hard: 'Těžké' };
   var wl = { none: 'Ne', once: '1×', multiple: 'Víckrát' };
   var cl = { better: '✓ Lepší', same: '= Stejný', worse: '✗ Horší' };
+  var spl = { music: '♪ Hudba', content: '◉ Obsah', both: '⚡ Obojí' };
+  var fll = { smooth: 'Plynulý', mild: 'Mírné vlny', severe: 'Výrazné výkyvy' };
   var h = '<div style="display:grid;gap:6px;">';
   h += '<div class="pill pill-dose" style="display:inline-block;width:fit-content;">' + e.dose + 'mg v ' + e.doseTime + '</div>';
   h += mr('Iniciace', sb(e.initiation));
   h += mr('Focus', sb(e.focus));
   h += mr('Emo. reaktivita', sb(e.emotionalReactivity));
+  h += mr('Paměť', sb(e.memory));
+  h += mr('Konverzace', spl[e.socialPerception] || '—');
+  h += mr('Stabilita efektu', fll[e.fluctuations] || '—');
+  h += mr('Konec efektu', e.effectEndTime || '—');
   h += mr('Hlad', e.hungerNoticed === 'yes' ? 'Ano' : 'Ne');
   h += mr('První jídlo', e.firstMeal || '—');
   h += mr('Tepová frekvence', e.heartRate ? e.heartRate + ' bpm' : '—');
@@ -1061,7 +1110,8 @@ function renderTrend() {
     data: { labels: lb, datasets: [
       mkds('Iniciace', r.map(function(e){return e.initiation;}), '#6c8cff'),
       mkds('Focus', r.map(function(e){return e.focus;}), '#4ecb71'),
-      mkds('Emo. reaktivita', r.map(function(e){return e.emotionalReactivity;}), '#f0a030')
+      mkds('Emo. reaktivita', r.map(function(e){return e.emotionalReactivity;}), '#f0a030'),
+      mkds('Paměť', r.map(function(e){return e.memory || null;}), '#a78bfa')
     ]},
     options: co(1, 5)
   });
@@ -1111,22 +1161,22 @@ function renderDose() {
   for (var i = 0; i < entries.length; i++) { if (entries[i].dose > 0) doseSet[entries[i].dose] = true; }
   var doses = Object.keys(doseSet).map(Number).sort(function(a,b){return a-b;});
   if (doses.length < 1) { ctr.innerHTML = '<div class="no-data">Zatím jen jedna dávka</div>'; return; }
-  var ms = ['initiation','focus','emotionalReactivity'];
-  var ml = { initiation: 'Iniciace', focus: 'Focus', emotionalReactivity: 'Emo. reaktivita' };
+  var ms = ['initiation','focus','emotionalReactivity','memory'];
+  var ml = { initiation: 'Iniciace', focus: 'Focus', emotionalReactivity: 'Emo. reaktivita', memory: 'Paměť' };
   var cardsHtml = '';
   for (var di = 0; di < doses.length; di++) {
     var dose = doses[di];
     var de = entries.filter(function(e){return e.dose === dose;});
-    var sum = 0;
+    var sum = 0; var cnt = 0;
     for (var mi = 0; mi < ms.length; mi++) {
       var vals = de.map(function(e){return e[ms[mi]];}).filter(function(v){return v != null;});
-      sum += vals.length ? vals.reduce(function(a,b){return a+b;},0)/vals.length : 0;
+      if (vals.length) { sum += vals.reduce(function(a,b){return a+b;},0)/vals.length; cnt++; }
     }
-    var avg = sum / ms.length;
+    var avg = cnt ? sum / cnt : 0;
     cardsHtml += '<div class="dose-card"><div class="dl">' + dose + 'mg</div><div class="dv">' + avg.toFixed(1) + '</div><div class="ds">Ø skóre (' + de.length + ' dní)</div></div>';
   }
   ctr.innerHTML = cardsHtml;
-  var cls = ['rgba(108,140,255,0.7)','rgba(78,203,113,0.7)','rgba(240,160,48,0.7)'];
+  var cls = ['rgba(108,140,255,0.7)','rgba(78,203,113,0.7)','rgba(240,160,48,0.7)','rgba(168,139,250,0.7)'];
   var datasets = [];
   for (var mi = 0; mi < ms.length; mi++) {
     var m = ms[mi];
@@ -1146,8 +1196,8 @@ function renderDose() {
 
 function renderCorr() {
   var ctr = document.getElementById('corrMatrix');
-  var ms = ['initiation','focus','emotionalReactivity','dose','heartRate'];
-  var lb = ['Init','Focus','Emo','Dávka','Tep'];
+  var ms = ['initiation','focus','emotionalReactivity','memory','dose','heartRate'];
+  var lb = ['Init','Focus','Emo','Mem','Dávka','Tep'];
   var hasEnough = true;
   for (var i = 0; i < ms.length; i++) {
     var cnt = 0;
