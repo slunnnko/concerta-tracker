@@ -1,9 +1,10 @@
-// ── Health Import — Apple Health XML + Withings CSV ──
+// ── Health Import — Apple Health XML + Withings CSV + Withings API ──
 
 import { state } from './state.js';
 import { t } from './i18n.js';
 import { toast } from './ui.js';
 import { saveHealthData } from './storage.js';
+import { getConfig } from './config.js';
 
 // ── Apple Health XML import ──
 // Uses streaming approach for large files
@@ -197,4 +198,236 @@ function normalizeDate(str) {
     if (a > 1900) return `${a}-${String(b).padStart(2, '0')}-${String(c).padStart(2, '0')}`;
   }
   return null;
+}
+
+// ══════════════════════════════════════════════
+// ── Withings OAuth2 API Integration ──
+// Requires: Cloudflare Worker proxy for token exchange (CORS)
+// Config: withings.clientId, withings.clientSecret, withings.proxyUrl
+// ══════════════════════════════════════════════
+
+const WITHINGS_AUTH_URL = 'https://account.withings.com/oauth2_user/authorize2';
+const WITHINGS_TOKEN_URL = 'https://wbsapi.withings.net/v2/oauth2';
+const WITHINGS_MEASURE_URL = 'https://wbsapi.withings.net/measure';
+const WITHINGS_SLEEP_URL = 'https://wbsapi.withings.net/v2/sleep';
+const WITHINGS_TOKEN_KEY = 'ct_withings_token';
+
+/**
+ * Check if Withings is configured.
+ */
+export function isWithingsConfigured() {
+  const cfg = getConfig();
+  return !!(cfg.withings?.clientId && cfg.withings?.proxyUrl);
+}
+
+/**
+ * Start Withings OAuth2 flow — redirects to Withings login page.
+ */
+export function startWithingsAuth() {
+  const cfg = getConfig();
+  if (!cfg.withings?.clientId || !cfg.withings?.proxyUrl) {
+    toast(t('withings.notConfigured'));
+    return;
+  }
+
+  const redirectUri = cfg.withings.redirectUri || window.location.origin + window.location.pathname;
+  const scope = 'user.metrics,user.activity';
+  const stateParam = 'withings_' + Date.now();
+  sessionStorage.setItem('withings_state', stateParam);
+
+  const url = `${WITHINGS_AUTH_URL}?response_type=code&client_id=${encodeURIComponent(cfg.withings.clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scope)}&state=${encodeURIComponent(stateParam)}`;
+  window.location.href = url;
+}
+
+/**
+ * Handle OAuth2 callback — call after page load if URL has ?code= param.
+ */
+export async function handleWithingsCallback() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get('code');
+  const returnedState = params.get('state');
+
+  if (!code || !returnedState?.startsWith('withings_')) return false;
+
+  const savedState = sessionStorage.getItem('withings_state');
+  if (returnedState !== savedState) {
+    toast('Withings auth state mismatch');
+    return false;
+  }
+  sessionStorage.removeItem('withings_state');
+
+  // Clean URL
+  window.history.replaceState({}, '', window.location.pathname);
+
+  // Exchange code for token via proxy
+  const cfg = getConfig();
+  const redirectUri = cfg.withings.redirectUri || window.location.origin + window.location.pathname;
+
+  try {
+    toast(t('withings.exchangingToken'));
+    const res = await fetch(cfg.withings.proxyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'requesttoken',
+        grant_type: 'authorization_code',
+        client_id: cfg.withings.clientId,
+        client_secret: cfg.withings.clientSecret,
+        code,
+        redirect_uri: redirectUri,
+      }),
+    });
+    const data = await res.json();
+
+    if (data.status === 0 && data.body?.access_token) {
+      const tokenData = {
+        access_token: data.body.access_token,
+        refresh_token: data.body.refresh_token,
+        expires_at: Date.now() + (data.body.expires_in * 1000),
+        userid: data.body.userid,
+      };
+      localStorage.setItem(WITHINGS_TOKEN_KEY, JSON.stringify(tokenData));
+      toast(t('withings.connected'));
+      return true;
+    } else {
+      toast('Withings token error: ' + (data.error || 'unknown'));
+      return false;
+    }
+  } catch (e) {
+    console.error('Withings token exchange error:', e);
+    toast(t('toast.connError'));
+    return false;
+  }
+}
+
+/**
+ * Refresh Withings token if expired.
+ */
+async function refreshWithingsToken() {
+  const cfg = getConfig();
+  let tokenData;
+  try { tokenData = JSON.parse(localStorage.getItem(WITHINGS_TOKEN_KEY)); } catch { return null; }
+  if (!tokenData?.refresh_token) return null;
+
+  // Still valid?
+  if (tokenData.expires_at > Date.now() + 60000) return tokenData.access_token;
+
+  try {
+    const res = await fetch(cfg.withings.proxyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'requesttoken',
+        grant_type: 'refresh_token',
+        client_id: cfg.withings.clientId,
+        client_secret: cfg.withings.clientSecret,
+        refresh_token: tokenData.refresh_token,
+      }),
+    });
+    const data = await res.json();
+    if (data.status === 0 && data.body?.access_token) {
+      tokenData.access_token = data.body.access_token;
+      tokenData.refresh_token = data.body.refresh_token;
+      tokenData.expires_at = Date.now() + (data.body.expires_in * 1000);
+      localStorage.setItem(WITHINGS_TOKEN_KEY, JSON.stringify(tokenData));
+      return tokenData.access_token;
+    }
+  } catch (e) {
+    console.error('Withings token refresh error:', e);
+  }
+  return null;
+}
+
+/**
+ * Check if we have a valid Withings token.
+ */
+export function hasWithingsToken() {
+  try {
+    const tokenData = JSON.parse(localStorage.getItem(WITHINGS_TOKEN_KEY));
+    return !!(tokenData?.access_token);
+  } catch { return false; }
+}
+
+/**
+ * Fetch data from Withings API and merge into healthData.
+ */
+export async function fetchWithingsData(startDate, endDate) {
+  const token = await refreshWithingsToken();
+  if (!token) {
+    toast(t('withings.notConnected'));
+    return;
+  }
+
+  toast(t('withings.fetching'));
+  const start = Math.floor(new Date(startDate + 'T00:00:00').getTime() / 1000);
+  const end = Math.floor(new Date(endDate + 'T23:59:59').getTime() / 1000);
+  let imported = 0;
+
+  try {
+    // Fetch measurements (weight, blood pressure, heart rate)
+    const measRes = await fetch(WITHINGS_MEASURE_URL + '?action=getmeas', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: `action=getmeas&meastype=1,9,10,11&category=1&startdate=${start}&enddate=${end}`,
+    });
+    const measData = await measRes.json();
+
+    if (measData.status === 0 && measData.body?.measuregrps) {
+      for (const grp of measData.body.measuregrps) {
+        const date = new Date(grp.date * 1000).toISOString().slice(0, 10);
+        if (!state.healthData[date]) state.healthData[date] = {};
+
+        for (const m of grp.measures) {
+          const val = m.value * Math.pow(10, m.unit);
+          // meastype: 1=weight, 9=diastolic, 10=systolic, 11=heartRate
+          if (m.type === 1) state.healthData[date].weight = Math.round(val * 10) / 10;
+          if (m.type === 9) state.healthData[date].diastolic = Math.round(val);
+          if (m.type === 10) state.healthData[date].systolic = Math.round(val);
+          if (m.type === 11) state.healthData[date].heartRate = Math.round(val);
+          imported++;
+        }
+      }
+    }
+
+    // Fetch sleep summary
+    const sleepRes = await fetch(WITHINGS_SLEEP_URL + '?action=getsummary', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: `action=getsummary&startdateymd=${startDate}&enddateymd=${endDate}`,
+    });
+    const sleepData = await sleepRes.json();
+
+    if (sleepData.status === 0 && sleepData.body?.series) {
+      for (const s of sleepData.body.series) {
+        const date = s.date;
+        if (!state.healthData[date]) state.healthData[date] = {};
+        if (s.data) {
+          if (s.data.total_sleep_time) state.healthData[date].sleepHours = Math.round(s.data.total_sleep_time / 3600 * 10) / 10;
+          if (s.data.sleep_score) state.healthData[date].sleepScore = s.data.sleep_score;
+          if (s.data.hr_average) state.healthData[date].sleepHrAvg = Math.round(s.data.hr_average);
+          imported++;
+        }
+      }
+    }
+
+    saveHealthData();
+    toast(t('toast.healthImported', { n: imported }));
+  } catch (e) {
+    console.error('Withings API error:', e);
+    toast(t('toast.importError'));
+  }
+}
+
+/**
+ * Disconnect Withings — remove stored token.
+ */
+export function disconnectWithings() {
+  localStorage.removeItem(WITHINGS_TOKEN_KEY);
+  toast(t('withings.disconnected'));
 }

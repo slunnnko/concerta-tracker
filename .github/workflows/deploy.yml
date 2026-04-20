@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: Deploy to GitHub Pages & Cloudflare Worker
 
 on:
   push:
@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  deploy-pages:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -28,3 +28,14 @@ jobs:
           path: '.'
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  deploy-worker:
+    runs-on: ubuntu-latest
+    if: vars.DEPLOY_WORKER == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy workers/withings-proxy.js --name withings-proxy --compatibility-date 2024-01-01

@@ -5,6 +5,7 @@ import { t, setLang, getLang, getAvailableLangs } from './i18n.js';
 import { toast, updateStatus } from './ui.js';
 import { saveSettings, saveGistConfig, testGistConnection, exportJSON, importJSON, saveEntries, saveToGist, isFileSystemSupported, hasFileHandle, pickSyncFile, openSyncFile, syncFromFile } from './storage.js';
 import { searchDrugs, createCustomDrug, atcToCategory } from './drug-search.js';
+import { isWithingsConfigured, hasWithingsToken, startWithingsAuth, fetchWithingsData, disconnectWithings } from './health-import.js';
 import { PROFILES } from './drug-profiles.js';
 import { copyAiExport, downloadAiExport } from './ai-export.js';
 import { showConfigEditor } from './config-editor.js';
@@ -102,13 +103,30 @@ export function renderSettings(container) {
   </div>`;
 
   // Health import
+  const wConfigured = isWithingsConfigured();
+  const wConnected = hasWithingsToken();
   html += `<div class="settings-section">
     <h3>${t('settings.healthImport')}</h3>
-    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+    <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px;">
       <button class="btn-s" id="btnAppleHealth">${t('settings.appleHealth')}</button>
       <button class="btn-s" id="btnWithingsCsv">${t('settings.withingsCsv')}</button>
     </div>
-  </div>`;
+    <div style="border-top:1px solid var(--border);padding-top:12px;">
+      <div style="font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:8px;">Withings API</div>`;
+
+  if (!wConfigured) {
+    html += `<p style="font-size:12px;color:var(--text-dim);">${t('withings.setupHint')}</p>`;
+  } else if (wConnected) {
+    html += `<div style="font-size:11px;color:var(--success);margin-bottom:8px;">✓ ${t('withings.connected')}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn-s" id="btnWithingsFetch" style="border-color:var(--success);color:var(--success);">${t('withings.fetchData')}</button>
+        <button class="btn-s" id="btnWithingsDisconnect" style="border-color:var(--danger);color:var(--danger);">${t('withings.disconnect')}</button>
+      </div>`;
+  } else {
+    html += `<button class="btn-s" id="btnWithingsConnect" style="border-color:var(--accent);color:var(--accent);">${t('withings.connect')}</button>`;
+  }
+
+  html += `</div></div>`;
 
   // Config editor
   html += `<div class="settings-section">
@@ -226,10 +244,30 @@ function bindSettingsEvents(container) {
       notify({ type: 'import-apple-health' });
     });
   }
-  const withingsBtn = document.getElementById('btnWithingsCsv');
-  if (withingsBtn) {
-    withingsBtn.addEventListener('click', () => {
+  const withingsCsvBtn = document.getElementById('btnWithingsCsv');
+  if (withingsCsvBtn) {
+    withingsCsvBtn.addEventListener('click', () => {
       notify({ type: 'import-withings-csv' });
+    });
+  }
+  const withingsConnectBtn = document.getElementById('btnWithingsConnect');
+  if (withingsConnectBtn) {
+    withingsConnectBtn.addEventListener('click', startWithingsAuth);
+  }
+  const withingsFetchBtn = document.getElementById('btnWithingsFetch');
+  if (withingsFetchBtn) {
+    withingsFetchBtn.addEventListener('click', () => {
+      // Fetch last 30 days
+      const end = new Date().toISOString().slice(0, 10);
+      const start = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+      fetchWithingsData(start, end);
+    });
+  }
+  const withingsDisconnectBtn = document.getElementById('btnWithingsDisconnect');
+  if (withingsDisconnectBtn) {
+    withingsDisconnectBtn.addEventListener('click', () => {
+      disconnectWithings();
+      renderSettings(container);
     });
   }
 
