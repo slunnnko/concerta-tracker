@@ -318,6 +318,16 @@ const TRANSLATIONS = {
     'toast.alreadyEncrypted': 'Gist už je šifrovaný — odemkni místo nastavení',
     'toast.legacyFound': 'Starý nešifrovaný soubor v Gistu — zapni šifrování pro migraci',
     'status.legacyFound': 'Nezašifrovaná data v Gistu',
+
+    // Health data (raw fields imported from devices)
+    'deviceData.title': 'Data ze zařízení',
+    'health.spo2': 'SpO₂',
+    'health.restingHeartRate': 'Klidový tep',
+    'health.hrv': 'HRV',
+    'health.fatMass': 'Tuková hmota',
+    'health.distance': 'Vzdálenost',
+    'health.calories': 'Kalorie',
+    'health.sleepDuration': 'Délka spánku',
   },
 
   en: {
@@ -618,6 +628,16 @@ const TRANSLATIONS = {
     'toast.alreadyEncrypted': 'Gist already encrypted — unlock instead',
     'toast.legacyFound': 'Unencrypted file found in Gist — enable encryption to migrate',
     'status.legacyFound': 'Plaintext data in Gist',
+
+    // Health data (raw fields imported from devices)
+    'deviceData.title': 'Device data',
+    'health.spo2': 'SpO₂',
+    'health.restingHeartRate': 'Resting heart rate',
+    'health.hrv': 'HRV',
+    'health.fatMass': 'Fat mass',
+    'health.distance': 'Distance',
+    'health.calories': 'Calories',
+    'health.sleepDuration': 'Sleep duration',
   }
 };
 

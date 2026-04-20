@@ -6,6 +6,40 @@ import { toast, showModal, closeModal, fmtDateShort, fmtDateLong, pillClass, sca
 import { METRICS, getMetricsForProfile } from './drug-profiles.js';
 import { saveEntries, saveToGist } from './storage.js';
 
+// ── Labels for raw healthData keys (Withings + Apple Health) ──
+const HEALTH_LABELS = {
+  heartRate: 'metric.heartRate',
+  sleepHours: 'metric.sleepHours',
+  sleepScore: 'metric.sleepScore',
+  sleepHrAvg: 'metric.sleepHrAvg',
+  weight: 'metric.weight',
+  steps: 'metric.steps',
+  systolic: 'metric.bloodPressureSys',
+  diastolic: 'metric.bloodPressureDia',
+  spo2: 'health.spo2',
+  restingHeartRate: 'health.restingHeartRate',
+  hrv: 'health.hrv',
+  fatMass: 'health.fatMass',
+  distance: 'health.distance',
+  calories: 'health.calories',
+  sleepDuration: 'health.sleepDuration',
+};
+
+const HEALTH_UNITS = {
+  heartRate: 'bpm',
+  sleepHours: 'h',
+  sleepHrAvg: 'bpm',
+  weight: 'kg',
+  systolic: 'mmHg',
+  diastolic: 'mmHg',
+  spo2: '%',
+  restingHeartRate: 'bpm',
+  hrv: 'ms',
+  fatMass: 'kg',
+  distance: 'm',
+  sleepDuration: 's',
+};
+
 export function renderHistory() {
   const list = document.getElementById('historyList');
   if (!list) return;
@@ -128,6 +162,34 @@ function showDetail(date) {
       }
 
       h += detailRow(t(m.label), displayVal);
+    }
+  }
+
+  // Device data — everything Withings/Apple Health imported for this date,
+  // regardless of whether the drug profile lists those metrics.
+  const hd = state.healthData[date];
+  if (hd && Object.keys(hd).length) {
+    const shownAutoFillKeys = new Set();
+    if (e.metrics) {
+      for (const pm of getMetricsForProfile(e.drugCategory || 'generic', e.mode || 'advanced')) {
+        const def = METRICS[pm.id];
+        if (def?.autoFill && e.metrics[pm.id] != null) shownAutoFillKeys.add(def.autoFill);
+      }
+    }
+
+    let deviceRows = '';
+    for (const [k, v] of Object.entries(hd)) {
+      if (v == null || v === '') continue;
+      if (shownAutoFillKeys.has(k)) continue;
+      const labelKey = HEALTH_LABELS[k];
+      const label = labelKey ? t(labelKey) : k;
+      const unit = HEALTH_UNITS[k];
+      deviceRows += detailRow(label, unit ? `${v} ${unit}` : String(v));
+    }
+
+    if (deviceRows) {
+      h += `<div style="margin-top:12px;padding-top:8px;border-top:1px dashed var(--border);font-size:11px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;">${t('deviceData.title')}</div>`;
+      h += deviceRows;
     }
   }
 
