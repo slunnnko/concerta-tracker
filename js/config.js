@@ -9,10 +9,20 @@ const CONFIG_KEY = 'ct_config';
 const DEFAULT_CONFIG = {
   // ── Dose settings ──
   dose: {
-    maxDosesPerDay: 3,
-    allowCustomDose: true,        // allow typing any value, not just step increments
-    defaultDoseTime: '07:00',
+    dosesPerDayOptions: [1, 2, 3], // toggle list for doses/day selector
+    allowCustomDose: true,          // allow typing any value, not just step increments
+    customDoseValues: [],           // predefined dose buttons, e.g. [17.5, 35, 52.5, 70]
     doseTimePresets: ['07:00', '12:00', '18:00'],
+  },
+
+  // ── Withings API ──
+  withings: {
+    clientId: '',                   // from developer.withings.com
+    clientSecret: '',               // from developer.withings.com
+    proxyUrl: '',                   // Cloudflare Worker URL for OAuth token exchange
+    redirectUri: '',                // auto-detected if empty (current page URL)
+    // Available data types to fetch
+    fetchTypes: ['weight', 'heartRate', 'bloodPressure', 'sleep', 'activity'],
   },
 
   // ── Form settings ──

@@ -10,7 +10,7 @@ import { renderForm, checkExists, editEntry, loadFormForDate } from './form.js';
 import { renderHistory } from './history.js';
 import { renderCharts } from './charts.js';
 import { renderSettings } from './settings.js';
-import { importAppleHealth, importWithingsCsv } from './health-import.js';
+import { importAppleHealth, importWithingsCsv, handleWithingsCallback } from './health-import.js';
 import { showSection, updateStatus, bindModalClose, toast, dateKey } from './ui.js';
 
 // ── Init ──
@@ -25,6 +25,9 @@ async function init() {
   bindNav();
   bindModalClose();
   setupSync();
+
+  // Handle Withings OAuth callback if returning from auth
+  await handleWithingsCallback();
 
   // Subscribe to state changes
   subscribe(handleEvent);

@@ -35,14 +35,13 @@ export function renderForm(container) {
 
   // Dose card
   const cfg = getConfig();
-  const maxDoses = cfg.dose.maxDosesPerDay || 3;
+  const dpdOptions = cfg.dose.dosesPerDayOptions || [1, 2, 3];
   html += `<div class="form-card">
     <div class="form-card-title">${t('form.dose')}</div>
     <div class="field">
       <label>${t('form.dosesPerDay')}</label>
-      <div class="input-row">
-        <input type="number" id="f-dosesPerDay" value="${dosesPerDay}" min="1" max="${maxDoses}" style="width:60px;">
-        <span class="unit">×</span>
+      <div class="toggle-group" id="dosesPerDayToggle">
+        ${dpdOptions.map(n => `<button class="toggle-btn ${n === dosesPerDay ? 'sel' : ''}" data-dpd="${n}">${n}×</button>`).join('')}
       </div>
     </div>
     <div class="dose-rows" id="doseRows">
@@ -102,18 +101,32 @@ function renderDoseRows(count, drug) {
   const cfg = getConfig();
   const timePresets = cfg.dose.doseTimePresets || ['07:00', '12:00', '18:00'];
   const allowCustom = cfg.dose.allowCustomDose;
+  // Merge custom dose values from config with drug defaults
+  const customValues = cfg.dose.customDoseValues?.length ? cfg.dose.customDoseValues : (drug.doseCommon || []);
   let html = '';
   for (let i = 0; i < count; i++) {
     const label = count > 1 ? t('form.dose.n', { n: i + 1, total: count }) : t('form.dose.amount');
     const defaultTime = timePresets[i] || timePresets[0] || '07:00';
     const step = allowCustom ? 'any' : (drug.doseStep || 1);
-    const defaultDose = drug.doseCommon?.[0] || '';
-    html += `<div class="dose-row-item">
-      <span class="dose-row-label">${label}</span>
-      <input type="number" class="dose-amount" data-idx="${i}" value="${defaultDose}" step="${step}" min="0" placeholder="—">
-      <span class="unit">${drug.doseUnit || 'mg'}</span>
-      <span class="unit">${t('form.dose.time')}</span>
-      <input type="time" class="dose-time" data-idx="${i}" value="${defaultTime}">
+    const defaultDose = customValues[0] || '';
+
+    // Dose quick-pick buttons
+    let quickPick = '';
+    if (customValues.length > 1) {
+      quickPick = `<div class="toggle-group dose-quick-pick" data-dose-idx="${i}" style="margin-bottom:6px;">
+        ${customValues.map(v => `<button class="toggle-btn" data-dv="${v}" style="flex:0;padding:6px 10px;font-size:11px;height:auto;">${v}</button>`).join('')}
+      </div>`;
+    }
+
+    html += `<div class="dose-row-item" style="flex-direction:column;align-items:stretch;gap:4px;">
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span class="dose-row-label">${label}</span>
+        <input type="number" class="dose-amount" data-idx="${i}" value="${defaultDose}" step="${step}" min="0" placeholder="—">
+        <span class="unit">${drug.doseUnit || 'mg'}</span>
+        <span class="unit">${t('form.dose.time')}</span>
+        <input type="time" class="dose-time" data-idx="${i}" value="${defaultTime}">
+      </div>
+      ${quickPick}
     </div>`;
   }
   return html;
@@ -212,16 +225,24 @@ function bindFormEvents(container) {
     });
   }
 
-  // Doses per day change
-  const dpd = document.getElementById('f-dosesPerDay');
-  if (dpd) {
-    dpd.addEventListener('change', () => {
-      const count = Math.max(1, Math.min(6, parseInt(dpd.value) || 1));
-      dpd.value = count;
-      const drug = state.settings.activeDrug;
-      document.getElementById('doseRows').innerHTML = renderDoseRows(count, drug);
-    });
+  // Doses per day toggle
+  const dpdToggle = document.getElementById('dosesPerDayToggle');
+  if (dpdToggle) {
+    for (const btn of dpdToggle.querySelectorAll('.toggle-btn')) {
+      btn.addEventListener('click', () => {
+        for (const s of dpdToggle.querySelectorAll('.toggle-btn')) s.classList.remove('sel');
+        btn.classList.add('sel');
+        const count = parseInt(btn.dataset.dpd) || 1;
+        const drug = state.settings.activeDrug;
+        const rowsHtml = renderDoseRows(count, drug);
+        document.getElementById('doseRows').innerHTML = rowsHtml;
+        bindDoseQuickPicks(container);
+      });
+    }
   }
+
+  // Dose quick-pick buttons
+  bindDoseQuickPicks(container);
 
   // Mode toggle
   for (const btn of container.querySelectorAll('.mode-btn')) {
@@ -236,6 +257,27 @@ function bindFormEvents(container) {
   if (saveBtn) {
     saveBtn.addEventListener('click', saveEntry);
   }
+}
+
+function bindDoseQuickPicks(container) {
+  for (const group of container.querySelectorAll('.dose-quick-pick')) {
+    const idx = group.dataset.doseIdx;
+    for (const btn of group.querySelectorAll('.toggle-btn')) {
+      btn.addEventListener('click', () => {
+        // Deselect siblings
+        for (const s of group.querySelectorAll('.toggle-btn')) s.classList.remove('sel');
+        btn.classList.add('sel');
+        // Set the corresponding input value
+        const input = container.querySelector(`.dose-amount[data-idx="${idx}"]`);
+        if (input) input.value = btn.dataset.dv;
+      });
+    }
+  }
+}
+
+function getDosesPerDay() {
+  const sel = document.querySelector('#dosesPerDayToggle .toggle-btn.sel');
+  return sel ? parseInt(sel.dataset.dpd) || 1 : 1;
 }
 
 function getFieldValue(field) {
@@ -296,7 +338,7 @@ function saveEntry() {
     drugName: drug.name?.cs || drug.name?.en || drug.id,
     drugCategory: drug.category,
     doses: collectDoses(),
-    dosesPerDay: parseInt(document.getElementById('f-dosesPerDay')?.value) || 1,
+    dosesPerDay: getDosesPerDay(),
     mode,
     metrics: metricsData,
     healthData: {},
@@ -326,12 +368,17 @@ export function loadFormForDate(date) {
   resetForm();
   if (!entry) return;
 
-  // Load doses
-  const dpd = document.getElementById('f-dosesPerDay');
-  if (dpd && entry.dosesPerDay) {
-    dpd.value = entry.dosesPerDay;
+  // Load doses per day toggle
+  if (entry.dosesPerDay) {
+    const toggle = document.getElementById('dosesPerDayToggle');
+    if (toggle) {
+      for (const btn of toggle.querySelectorAll('.toggle-btn')) {
+        btn.classList.toggle('sel', parseInt(btn.dataset.dpd) === entry.dosesPerDay);
+      }
+    }
     const drug = state.settings.activeDrug;
     document.getElementById('doseRows').innerHTML = renderDoseRows(entry.dosesPerDay, drug);
+    bindDoseQuickPicks(document.getElementById('section-log'));
   }
   if (entry.doses) {
     const amounts = document.querySelectorAll('.dose-amount');

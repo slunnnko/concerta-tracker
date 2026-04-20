@@ -198,6 +198,18 @@ const TRANSLATIONS = {
     'config.resetDone': 'Konfigurace obnovena na výchozí',
     'config.reference': 'Reference — co lze konfigurovat',
 
+    // Withings
+    'withings.setupHint': 'Nastav Withings API v Konfiguraci (clientId, proxyUrl). Potřebuješ Cloudflare Worker jako proxy.',
+    'withings.connect': 'Připojit Withings',
+    'withings.connected': 'Withings připojen',
+    'withings.notConnected': 'Withings nepřipojen — přihlas se nejdříve',
+    'withings.notConfigured': 'Withings nenakonfigurován — nastav v Konfiguraci',
+    'withings.disconnect': 'Odpojit',
+    'withings.fetchData': 'Stáhnout data (30 dní)',
+    'withings.fetching': 'Stahuji data z Withings...',
+    'withings.exchangingToken': 'Připojuji Withings...',
+    'withings.disconnected': 'Withings odpojen',
+
     // Drug search
     'drug.search': 'Hledat lék...',
     'drug.searchByCondition': 'Hledat podle diagnózy...',
@@ -441,6 +453,17 @@ const TRANSLATIONS = {
     'config.saved': 'Configuration saved ✓',
     'config.resetDone': 'Configuration reset to defaults',
     'config.reference': 'Reference — what can be configured',
+
+    'withings.setupHint': 'Set up Withings API in Configuration (clientId, proxyUrl). You need a Cloudflare Worker as proxy.',
+    'withings.connect': 'Connect Withings',
+    'withings.connected': 'Withings connected',
+    'withings.notConnected': 'Withings not connected — log in first',
+    'withings.notConfigured': 'Withings not configured — set up in Configuration',
+    'withings.disconnect': 'Disconnect',
+    'withings.fetchData': 'Fetch data (30 days)',
+    'withings.fetching': 'Fetching Withings data...',
+    'withings.exchangingToken': 'Connecting Withings...',
+    'withings.disconnected': 'Withings disconnected',
 
     'drug.search': 'Search medication...',
     'drug.searchByCondition': 'Search by condition...',
