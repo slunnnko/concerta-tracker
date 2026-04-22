@@ -390,6 +390,8 @@ const TRANSLATIONS = {
 
     // HR toasts / confirm
     'heartRate.fetchDone': 'Intraday HR: zpracováno {n} dní',
+    'heartRate.alreadyUpToDate': 'Intraday HR: data jsou aktuální, není co stahovat',
+    'settings.hrAutoHint': 'Rozsah předvyplněn od {date} (navazuje na existující data)',
     'toast.missingDate': 'Zadej rozsah dat',
     'toast.baselineCleared': 'Baseline smazán',
     'confirm.clearBaseline': 'Smazat baseline a všechna detekovaná okna?',
@@ -765,6 +767,8 @@ const TRANSLATIONS = {
 
     // HR toasts / confirm
     'heartRate.fetchDone': 'Intraday HR: {n} days processed',
+    'heartRate.alreadyUpToDate': 'Intraday HR: already up to date, nothing to fetch',
+    'settings.hrAutoHint': 'Range pre-filled from {date} (continues existing data)',
     'toast.missingDate': 'Set the date range',
     'toast.baselineCleared': 'Baseline cleared',
     'confirm.clearBaseline': 'Clear baseline and all detected windows?',

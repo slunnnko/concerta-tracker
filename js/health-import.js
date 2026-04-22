@@ -558,6 +558,49 @@ export function disconnectWithings() {
 }
 
 // ══════════════════════════════════════════════
+// ── Smart date-range helpers ──
+// ══════════════════════════════════════════════
+
+/**
+ * Compute the optimal fetch range for daily Withings data.
+ * Finds the most recent date already in healthData and starts
+ * overlapDays before it (to re-fetch potentially incomplete last day).
+ * Falls back to defaultDays if no existing data.
+ */
+export function smartDailyRange(overlapDays = 2, defaultDays = 30) {
+  const today = new Date().toISOString().slice(0, 10);
+  const dates = Object.keys(state.healthData).sort();
+  if (!dates.length) {
+    return {
+      start: new Date(Date.now() - defaultDays * 86400000).toISOString().slice(0, 10),
+      end: today,
+      isAuto: true,
+    };
+  }
+  const lastDate = dates[dates.length - 1];
+  const start = new Date(new Date(lastDate + 'T12:00:00').getTime() - overlapDays * 86400000)
+    .toISOString().slice(0, 10);
+  return { start, end: today, isAuto: true };
+}
+
+/**
+ * Compute the optimal fetch range for intraday HR.
+ * Uses dates that already have hrIntradayCount to find the last fetched day,
+ * then starts overlapDays before it. Falls back to null if no intraday data.
+ */
+export function smartIntradayRange(overlapDays = 1) {
+  const today = new Date().toISOString().slice(0, 10);
+  const dates = Object.keys(state.healthData)
+    .filter(d => state.healthData[d]?.hrIntradayCount != null)
+    .sort();
+  if (!dates.length) return null; // no previous intraday — user must pick range manually
+  const lastDate = dates[dates.length - 1];
+  const start = new Date(new Date(lastDate + 'T12:00:00').getTime() - overlapDays * 86400000)
+    .toISOString().slice(0, 10);
+  return { start, end: today, isAuto: true };
+}
+
+// ══════════════════════════════════════════════
 // ── Withings Intraday HR — for medication window detection ──
 // Endpoint: /v2/measure action=getintradayactivity
 // Limit: one day per request; we loop and report progress.
@@ -660,7 +703,20 @@ export async function fetchWithingsIntraday(startDate, endDate, onProgress) {
   const cutoffStr = hrCfg.baselineCutoff || '';
   const cutoff = cutoffStr ? new Date(cutoffStr + 'T00:00:00') : null;
 
-  const dates = eachDate(startDate, endDate);
+  const allDates = eachDate(startDate, endDate);
+  // Skip dates that already have intraday data, except the last overlapDays
+  // (last day may be incomplete if fetched mid-day; yesterday might also be partial).
+  const overlapDays = 1;
+  const overlapCutoff = new Date(Date.now() - overlapDays * 86400000).toISOString().slice(0, 10);
+  const dates = allDates.filter(d =>
+    d >= overlapCutoff || state.healthData[d]?.hrIntradayCount == null
+  );
+
+  if (!dates.length) {
+    toast(t('heartRate.alreadyUpToDate'));
+    return;
+  }
+
   const total = dates.length;
   const baselineReadings = [];
   const perDay = {}; // date → cleaned readings (only kept for post-cutoff analysis)

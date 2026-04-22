@@ -10,7 +10,7 @@ import {
 } from './sync-unlock.js';
 import { isWebAuthnSupported } from './passkey.js';
 import { searchDrugs, createCustomDrug, atcToCategory } from './drug-search.js';
-import { isWithingsConfigured, hasWithingsToken, startWithingsAuth, fetchWithingsData, disconnectWithings, fetchWithingsIntraday, clearHrBaseline } from './health-import.js';
+import { isWithingsConfigured, hasWithingsToken, startWithingsAuth, fetchWithingsData, disconnectWithings, fetchWithingsIntraday, clearHrBaseline, smartDailyRange, smartIntradayRange } from './health-import.js';
 import { getConfig, saveConfig } from './config.js';
 import { PROFILES } from './drug-profiles.js';
 import { copyAiExport, downloadAiExport } from './ai-export.js';
@@ -159,7 +159,8 @@ export function renderSettings(container) {
   const cfg = getConfig();
   const hr = cfg.heartRate || {};
   const today = new Date().toISOString().slice(0, 10);
-  const defaultStart = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+  const autoIntraday = smartIntradayRange(1);
+  const defaultStart = autoIntraday?.start ?? new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
   const hasBaseline = !!state.hrBaseline?.slots;
   const slotCount = hasBaseline ? Object.keys(state.hrBaseline.slots).length : 0;
   html += `<div class="settings-section">
@@ -198,6 +199,7 @@ export function renderSettings(container) {
       <label>${t('settings.hrRangeEnd')}</label>
       <input type="date" id="s-hrEnd" value="${today}">
     </div>
+    ${autoIntraday ? `<div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;">${t('settings.hrAutoHint', { date: autoIntraday.start })}</div>` : ''}
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
       <button class="btn-s" id="btnHrSaveCfg">${t('settings.save')}</button>
       <button class="btn-s" id="btnHrFetch" style="border-color:var(--accent);color:var(--accent);" ${wConnected ? '' : 'disabled'}>${t('settings.hrFetch')}</button>
@@ -419,9 +421,7 @@ function bindSettingsEvents(container) {
   const withingsFetchBtn = document.getElementById('btnWithingsFetch');
   if (withingsFetchBtn) {
     withingsFetchBtn.addEventListener('click', () => {
-      // Fetch last 30 days
-      const end = new Date().toISOString().slice(0, 10);
-      const start = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+      const { start, end } = smartDailyRange(2, 30);
       fetchWithingsData(start, end);
     });
   }
