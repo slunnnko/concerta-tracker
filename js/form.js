@@ -12,6 +12,18 @@ import { getConfig } from './config.js';
  * Auto-fill form fields from imported health device data (Withings, Apple Health).
  * Looks up state.healthData[date] and fills matching metric inputs.
  */
+function normalize24h(val) {
+  if (!val || typeof val !== 'string') return val;
+  if (/^\d{1,2}:\d{2}$/.test(val)) return val;
+  const m = val.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)$/i);
+  if (!m) return val;
+  let h = parseInt(m[1]);
+  const min = m[2];
+  if (m[3].toUpperCase() === 'AM') { if (h === 12) h = 0; }
+  else { if (h !== 12) h += 12; }
+  return `${String(h).padStart(2, '0')}:${min}`;
+}
+
 function autoFillFromHealthData(date) {
   const hd = state.healthData?.[date];
   if (!hd) return;
@@ -511,7 +523,7 @@ export function loadFormForDate(date) {
         if (btn) btn.className = (metric.type === 'toggle' ? 'toggle-btn' : 'energy-option') + ' sel';
       } else if (metric.type === 'time' || metric.type === 'number') {
         const input = document.getElementById('f-' + field);
-        if (input) input.value = val;
+        if (input) input.value = metric.type === 'time' ? normalize24h(val) : val;
       }
     }
   }

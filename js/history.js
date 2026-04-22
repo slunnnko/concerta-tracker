@@ -188,6 +188,8 @@ function showDetail(date) {
       } else if (m.type === 'toggle' || m.type === 'energy-slot') {
         const opt = m.options?.find(o => o.value === val);
         displayVal = opt ? t(opt.label) : val;
+      } else if (m.type === 'time') {
+        displayVal = normalize24h(val);
       } else {
         displayVal = val + (m.unit ? ' ' + m.unit : '');
       }
@@ -211,6 +213,8 @@ function showDetail(date) {
     let deviceRows = '';
     for (const [k, v] of Object.entries(hd)) {
       if (v == null || v === '') continue;
+      if (HD_SKIP_KEYS.has(k)) continue;
+      if (typeof v === 'object') continue;
       if (shownAutoFillKeys.has(k)) continue;
       const labelKey = HEALTH_LABELS[k];
       const label = labelKey ? t(labelKey) : k;
@@ -258,6 +262,21 @@ function showDetail(date) {
   };
 
   document.getElementById('modal').classList.add('show');
+}
+
+// Keys stored on hd that have dedicated rendering — skip in generic device data loop.
+const HD_SKIP_KEYS = new Set(['hrWindow', 'hrIntradayCount']);
+
+function normalize24h(val) {
+  if (!val || typeof val !== 'string') return val;
+  if (/^\d{1,2}:\d{2}$/.test(val)) return val;
+  const m = val.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)$/i);
+  if (!m) return val;
+  let h = parseInt(m[1]);
+  const min = m[2];
+  if (m[3].toUpperCase() === 'AM') { if (h === 12) h = 0; }
+  else { if (h !== 12) h += 12; }
+  return `${String(h).padStart(2, '0')}:${min}`;
 }
 
 function detailRow(label, value) {
