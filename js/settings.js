@@ -203,6 +203,7 @@ export function renderSettings(container) {
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
       <button class="btn-s" id="btnHrSaveCfg">${t('settings.save')}</button>
       <button class="btn-s" id="btnHrFetch" style="border-color:var(--accent);color:var(--accent);" ${wConnected ? '' : 'disabled'}>${t('settings.hrFetch')}</button>
+      <button class="btn-s" id="btnHrForce" style="border-color:var(--danger);color:var(--danger);" ${wConnected ? '' : 'disabled'}>${t('settings.hrForce')}</button>
       ${hasBaseline ? `<button class="btn-s" id="btnHrClearBaseline" style="border-color:var(--danger);color:var(--danger);">${t('settings.hrClearBaseline')}</button>` : ''}
     </div>
     <div id="hrProgress" style="margin-top:12px;display:none;">
@@ -448,40 +449,46 @@ function bindSettingsEvents(container) {
       toast(t('toast.settingsSaved'));
     });
   }
+  const runIntradayFetch = async (force = false) => {
+    const start = document.getElementById('s-hrStart').value;
+    const end = document.getElementById('s-hrEnd').value;
+    if (!start || !end) { toast(t('toast.missingDate')); return; }
+    const progWrap = document.getElementById('hrProgress');
+    const progBar = document.getElementById('hrProgressBar');
+    const progLabel = document.getElementById('hrProgressLabel');
+    const fetchBtn = document.getElementById('btnHrFetch');
+    const forceBtn = document.getElementById('btnHrForce');
+    if (fetchBtn) fetchBtn.disabled = true;
+    if (forceBtn) forceBtn.disabled = true;
+    if (progWrap) progWrap.style.display = 'block';
+    try {
+      await fetchWithingsIntraday(start, end, ({ current, total, date, phase, done }) => {
+        if (done) { if (progWrap) progWrap.style.display = 'none'; return; }
+        if (progBar) { progBar.max = total || 1; progBar.value = current || 0; }
+        if (progLabel) {
+          progLabel.textContent = t('settings.hrProgress', {
+            phase: t('settings.hrPhase.' + phase) || phase,
+            date: date || '',
+            current: current || 0,
+            total: total || 0,
+          });
+        }
+      }, { force });
+    } finally {
+      if (fetchBtn) fetchBtn.disabled = false;
+      if (forceBtn) forceBtn.disabled = false;
+      renderSettings(container);
+    }
+  };
+
   const hrFetchBtn = document.getElementById('btnHrFetch');
-  if (hrFetchBtn) {
-    hrFetchBtn.addEventListener('click', async () => {
-      const start = document.getElementById('s-hrStart').value;
-      const end = document.getElementById('s-hrEnd').value;
-      if (!start || !end) { toast(t('toast.missingDate')); return; }
-      const progWrap = document.getElementById('hrProgress');
-      const progBar = document.getElementById('hrProgressBar');
-      const progLabel = document.getElementById('hrProgressLabel');
-      hrFetchBtn.disabled = true;
-      if (progWrap) progWrap.style.display = 'block';
-      try {
-        await fetchWithingsIntraday(start, end, ({ current, total, date, phase, done, error }) => {
-          if (done) {
-            if (progWrap) progWrap.style.display = 'none';
-            return;
-          }
-          if (progBar) progBar.max = total || 1;
-          if (progBar) progBar.value = current || 0;
-          if (progLabel) {
-            progLabel.textContent = t('settings.hrProgress', {
-              phase: t('settings.hrPhase.' + phase) || phase,
-              date: date || '',
-              current: current || 0,
-              total: total || 0,
-            });
-          }
-        });
-      } finally {
-        hrFetchBtn.disabled = false;
-        renderSettings(container);
-      }
-    });
-  }
+  if (hrFetchBtn) hrFetchBtn.addEventListener('click', () => runIntradayFetch(false));
+
+  const hrForceBtn = document.getElementById('btnHrForce');
+  if (hrForceBtn) hrForceBtn.addEventListener('click', () => {
+    if (!confirm(t('confirm.hrForce'))) return;
+    runIntradayFetch(true);
+  });
   const hrClearBtn = document.getElementById('btnHrClearBaseline');
   if (hrClearBtn) {
     hrClearBtn.addEventListener('click', () => {

@@ -690,7 +690,7 @@ function caffeineFor(date) {
  * readings, analyze post-cutoff days and store per-day summaries.
  * onProgress({ current, total, date, phase: 'fetching'|'processing'|'baseline'|'analysis' })
  */
-export async function fetchWithingsIntraday(startDate, endDate, onProgress) {
+export async function fetchWithingsIntraday(startDate, endDate, onProgress, { force = false } = {}) {
   const token = await refreshWithingsToken();
   if (!token) {
     toast(t('withings.notConnected'));
@@ -704,13 +704,13 @@ export async function fetchWithingsIntraday(startDate, endDate, onProgress) {
   const cutoff = cutoffStr ? new Date(cutoffStr + 'T00:00:00') : null;
 
   const allDates = eachDate(startDate, endDate);
-  // Skip dates that already have intraday data, except the last overlapDays
-  // (last day may be incomplete if fetched mid-day; yesterday might also be partial).
+  // Skip dates that already have intraday data, except the last overlapDays.
+  // force=true bypasses the skip entirely.
   const overlapDays = 1;
   const overlapCutoff = new Date(Date.now() - overlapDays * 86400000).toISOString().slice(0, 10);
-  const dates = allDates.filter(d =>
-    d >= overlapCutoff || state.healthData[d]?.hrIntradayCount == null
-  );
+  const dates = force
+    ? allDates
+    : allDates.filter(d => d >= overlapCutoff || state.healthData[d]?.hrIntradayCount == null);
 
   if (!dates.length) {
     toast(t('heartRate.alreadyUpToDate'));
