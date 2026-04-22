@@ -26,8 +26,6 @@ function normalize24h(val) {
 
 function autoFillFromHealthData(date) {
   const hd = state.healthData?.[date];
-  if (!hd) return;
-
   const drug = state.settings.activeDrug;
   if (!drug) return;
 
@@ -36,9 +34,18 @@ function autoFillFromHealthData(date) {
 
   for (const m of metrics) {
     if (!m.autoFill) continue;
-    const val = hd[m.autoFill];
-    if (val == null) continue;
+    const val = hd?.[m.autoFill];
 
+    // Device-card display spans (read-only rows)
+    const span = document.querySelector(`.device-val[data-metric-id="${m.id}"]`);
+    if (span) {
+      span.textContent = val != null ? `${val}${m.unit ? ' ' + m.unit : ''}` : '—';
+      span.style.color = val != null ? 'var(--text-primary)' : 'var(--text-dim)';
+      continue;
+    }
+
+    // Fallback: editable input (heartRate in body group etc.)
+    if (val == null) continue;
     const input = document.getElementById('f-' + m.id);
     if (input) {
       input.value = val;
@@ -107,6 +114,13 @@ export function renderForm(container) {
     // Energy group is special — render as a grid
     if (groupId === 'energy') {
       html += renderEnergyCard(groupMetrics, groupDef);
+      continue;
+    }
+
+    // Device metric groups (deviceSleep, deviceActivity) and any autoFill metric
+    // → read-only display card, not editable inputs
+    if (groupId === 'deviceSleep' || groupId === 'deviceActivity') {
+      html += renderDeviceCard(groupMetrics, groupDef);
       continue;
     }
 
@@ -214,6 +228,23 @@ function renderMetricField(m) {
 
   html += `</div>`;
   return html;
+}
+
+function renderDeviceCard(metrics, groupDef) {
+  let rows = '';
+  for (const m of metrics) {
+    rows += `<div class="field" style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border);">
+      <span style="color:var(--text-secondary);font-size:13px;">${t(m.label)}</span>
+      <span class="device-val" data-metric-id="${m.id}" data-unit="${m.unit || ''}" style="font-size:13px;font-weight:500;color:var(--text-dim);">—</span>
+    </div>`;
+  }
+  return `<div class="form-card">
+    <div class="form-card-title" style="display:flex;justify-content:space-between;align-items:center;">
+      ${t(groupDef.title)}
+      <span style="font-size:10px;font-weight:400;color:var(--text-dim);letter-spacing:0;">⌚ ${t('form.deviceSource')}</span>
+    </div>
+    ${rows}
+  </div>`;
 }
 
 function renderEnergyCard(metrics, groupDef) {

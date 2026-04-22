@@ -17,6 +17,7 @@ const TRANSLATIONS = {
     'form.note': 'Poznámka',
     'form.note.placeholder': 'Cokoliv neobvyklého — jedna věta max',
     'form.dateExists': '— záznam existuje',
+    'form.deviceSource': 'ze zařízení',
 
     // Mode
     'mode.basic': 'Základní',
@@ -412,6 +413,7 @@ const TRANSLATIONS = {
     'form.note': 'Note',
     'form.note.placeholder': 'Anything unusual — one sentence max',
     'form.dateExists': '— entry exists',
+    'form.deviceSource': 'from device',
 
     'mode.basic': 'Basic',
     'mode.advanced': 'Advanced',

@@ -451,11 +451,11 @@ export const PROFILES = {
     basic: ['mood', 'focus', 'energy', 'appetite', 'sleep'],
     advanced: [
       'initiation', 'focus', 'emotionalReactivity', 'memory',
-      'onsetTime', 'afternoonDip',
-      'socialPerception', 'fluctuations', 'effectEndTime',
-      'hungerNoticed', 'firstMeal', 'heartRate', 'tinnitus', 'rls',
+      'afternoonDip',
+      'socialPerception', 'fluctuations',
+      'hungerNoticed', 'firstMeal', 'tinnitus', 'rls',
       'energyMorning', 'energyAfternoon', 'energyEvening',
-      'sleepOnset', 'nightWaking',
+      'sleepOnset',
     ],
   },
   ssri: {

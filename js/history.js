@@ -236,7 +236,7 @@ function showDetail(date) {
     }
 
     if (deviceRows) {
-      h += `<div style="margin-top:12px;padding-top:8px;border-top:1px dashed var(--border);font-size:11px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;">${t('deviceData.title')}</div>`;
+      h += `<div style="margin-top:12px;padding-top:8px;border-top:1px dashed var(--border);font-size:11px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;">⌚ ${t('deviceData.title')}</div>`;
       h += deviceRows;
     }
 
@@ -312,7 +312,7 @@ function fmtDuration(mins) {
 }
 
 function renderHrWindow(w) {
-  let html = `<div style="margin-top:12px;padding-top:8px;border-top:1px dashed var(--border);font-size:11px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;">${t('hrWindow.title')}</div>`;
+  let html = `<div style="margin-top:12px;padding-top:8px;border-top:1px dashed var(--border);font-size:11px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:1px;">~ ${t('hrWindow.title')}</div>`;
 
   if (w.onset) {
     const delay = w.onsetDelayFromDose != null ? ` (+${w.onsetDelayFromDose} min)` : '';
