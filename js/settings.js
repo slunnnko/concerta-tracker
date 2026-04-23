@@ -10,7 +10,7 @@ import {
 } from './sync-unlock.js';
 import { isWebAuthnSupported } from './passkey.js';
 import { searchDrugs, createCustomDrug, atcToCategory } from './drug-search.js';
-import { isWithingsConfigured, hasWithingsToken, startWithingsAuth, fetchWithingsData, disconnectWithings, fetchWithingsIntraday, clearHrBaseline, smartDailyRange, smartIntradayRange } from './health-import.js';
+import { isWithingsConfigured, hasWithingsToken, startWithingsAuth, disconnectWithings, syncWithings, fetchWithingsIntraday, clearHrBaseline, smartIntradayRange } from './health-import.js';
 import { getConfig, saveConfig } from './config.js';
 import { PROFILES } from './drug-profiles.js';
 import { copyAiExport, downloadAiExport } from './ai-export.js';
@@ -146,8 +146,12 @@ export function renderSettings(container) {
   } else if (wConnected) {
     html += `<div style="font-size:11px;color:var(--success);margin-bottom:8px;">✓ ${t('withings.connected')}</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn-s" id="btnWithingsFetch" style="border-color:var(--success);color:var(--success);">${t('withings.fetchData')}</button>
+        <button class="btn-s" id="btnWithingsSync" style="border-color:var(--success);color:var(--success);">${t('withings.sync')}</button>
         <button class="btn-s" id="btnWithingsDisconnect" style="border-color:var(--danger);color:var(--danger);">${t('withings.disconnect')}</button>
+      </div>
+      <div id="withingsSyncProgress" style="margin-top:8px;display:none;">
+        <progress id="withingsSyncBar" value="0" max="1" style="width:100%;height:6px;"></progress>
+        <div id="withingsSyncLabel" style="font-size:11px;color:var(--text-dim);margin-top:4px;"></div>
       </div>`;
   } else {
     html += `<button class="btn-s" id="btnWithingsConnect" style="border-color:var(--accent);color:var(--accent);">${t('withings.connect')}</button>`;
@@ -160,7 +164,6 @@ export function renderSettings(container) {
   const hr = cfg.heartRate || {};
   const today = new Date().toISOString().slice(0, 10);
   const autoIntraday = smartIntradayRange(1);
-  const defaultStart = autoIntraday?.start ?? new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
   const hasBaseline = !!state.hrBaseline?.slots;
   const slotCount = hasBaseline ? Object.keys(state.hrBaseline.slots).length : 0;
   html += `<div class="settings-section">
@@ -191,24 +194,10 @@ export function renderSettings(container) {
         <span class="unit">min</span>
       </div>
     </details>
-    <div class="settings-row">
-      <label>${t('settings.hrRangeStart')}</label>
-      <input type="date" id="s-hrStart" value="${defaultStart}">
-    </div>
-    <div class="settings-row">
-      <label>${t('settings.hrRangeEnd')}</label>
-      <input type="date" id="s-hrEnd" value="${today}">
-    </div>
-    ${autoIntraday ? `<div style="font-size:11px;color:var(--text-dim);margin-bottom:8px;">${t('settings.hrAutoHint', { date: autoIntraday.start })}</div>` : ''}
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
       <button class="btn-s" id="btnHrSaveCfg">${t('settings.save')}</button>
-      <button class="btn-s" id="btnHrFetch" style="border-color:var(--accent);color:var(--accent);" ${wConnected ? '' : 'disabled'}>${t('settings.hrFetch')}</button>
       <button class="btn-s" id="btnHrForce" style="border-color:var(--danger);color:var(--danger);" ${wConnected ? '' : 'disabled'}>${t('settings.hrForce')}</button>
       ${hasBaseline ? `<button class="btn-s" id="btnHrClearBaseline" style="border-color:var(--danger);color:var(--danger);">${t('settings.hrClearBaseline')}</button>` : ''}
-    </div>
-    <div id="hrProgress" style="margin-top:12px;display:none;">
-      <progress id="hrProgressBar" value="0" max="1" style="width:100%;height:8px;"></progress>
-      <div id="hrProgressLabel" style="font-size:11px;color:var(--text-dim);margin-top:4px;"></div>
     </div>
   </div>`;
 
@@ -419,13 +408,6 @@ function bindSettingsEvents(container) {
   if (withingsConnectBtn) {
     withingsConnectBtn.addEventListener('click', startWithingsAuth);
   }
-  const withingsFetchBtn = document.getElementById('btnWithingsFetch');
-  if (withingsFetchBtn) {
-    withingsFetchBtn.addEventListener('click', () => {
-      const { start, end } = smartDailyRange(2, 30);
-      fetchWithingsData(start, end);
-    });
-  }
   const withingsDisconnectBtn = document.getElementById('btnWithingsDisconnect');
   if (withingsDisconnectBtn) {
     withingsDisconnectBtn.addEventListener('click', () => {
@@ -449,45 +431,44 @@ function bindSettingsEvents(container) {
       toast(t('toast.settingsSaved'));
     });
   }
-  const runIntradayFetch = async (force = false) => {
-    const start = document.getElementById('s-hrStart').value;
-    const end = document.getElementById('s-hrEnd').value;
-    if (!start || !end) { toast(t('toast.missingDate')); return; }
-    const progWrap = document.getElementById('hrProgress');
-    const progBar = document.getElementById('hrProgressBar');
-    const progLabel = document.getElementById('hrProgressLabel');
-    const fetchBtn = document.getElementById('btnHrFetch');
-    const forceBtn = document.getElementById('btnHrForce');
-    if (fetchBtn) fetchBtn.disabled = true;
-    if (forceBtn) forceBtn.disabled = true;
-    if (progWrap) progWrap.style.display = 'block';
-    try {
-      await fetchWithingsIntraday(start, end, ({ current, total, date, phase, done }) => {
-        if (done) { if (progWrap) progWrap.style.display = 'none'; return; }
-        if (progBar) { progBar.max = total || 1; progBar.value = current || 0; }
-        if (progLabel) {
-          progLabel.textContent = t('settings.hrProgress', {
-            phase: t('settings.hrPhase.' + phase) || phase,
-            date: date || '',
-            current: current || 0,
-            total: total || 0,
-          });
-        }
-      }, { force });
-    } finally {
-      if (fetchBtn) fetchBtn.disabled = false;
-      if (forceBtn) forceBtn.disabled = false;
-      renderSettings(container);
-    }
-  };
-
-  const hrFetchBtn = document.getElementById('btnHrFetch');
-  if (hrFetchBtn) hrFetchBtn.addEventListener('click', () => runIntradayFetch(false));
+  const withingsSyncBtn = document.getElementById('btnWithingsSync');
+  if (withingsSyncBtn) {
+    withingsSyncBtn.addEventListener('click', async () => {
+      withingsSyncBtn.disabled = true;
+      const progWrap = document.getElementById('withingsSyncProgress');
+      const progBar  = document.getElementById('withingsSyncBar');
+      const progLabel = document.getElementById('withingsSyncLabel');
+      if (progWrap) progWrap.style.display = 'block';
+      try {
+        await syncWithings(({ current, total, date, phase, done }) => {
+          if (done) { if (progWrap) progWrap.style.display = 'none'; return; }
+          if (progBar) { progBar.max = total || 1; progBar.value = current || 0; }
+          if (progLabel) {
+            progLabel.textContent = t('settings.hrProgress', {
+              phase: t('settings.hrPhase.' + phase) || phase,
+              date: date || '',
+              current: current || 0,
+              total: total || 0,
+            });
+          }
+        });
+      } finally {
+        withingsSyncBtn.disabled = false;
+        renderSettings(container);
+      }
+    });
+  }
 
   const hrForceBtn = document.getElementById('btnHrForce');
-  if (hrForceBtn) hrForceBtn.addEventListener('click', () => {
+  if (hrForceBtn) hrForceBtn.addEventListener('click', async () => {
     if (!confirm(t('confirm.hrForce'))) return;
-    runIntradayFetch(true);
+    hrForceBtn.disabled = true;
+    try {
+      await syncWithings(null, { force: true });
+    } finally {
+      hrForceBtn.disabled = false;
+      renderSettings(container);
+    }
   });
   const hrClearBtn = document.getElementById('btnHrClearBaseline');
   if (hrClearBtn) {

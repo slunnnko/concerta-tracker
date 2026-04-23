@@ -557,6 +557,17 @@ export function disconnectWithings() {
   toast(t('withings.disconnected'));
 }
 
+/**
+ * One-shot sync: daily summary first (measurements, activity, sleep windows),
+ * then intraday HR (skips already-fetched days unless force=true).
+ * onProgress forwarded to intraday phase.
+ */
+export async function syncWithings(onProgress, { force = false } = {}) {
+  const { start, end } = smartDailyRange(2, 30);
+  await fetchWithingsData(start, end);
+  await fetchWithingsIntraday(start, end, onProgress, { force });
+}
+
 // ══════════════════════════════════════════════
 // ── Smart date-range helpers ──
 // ══════════════════════════════════════════════
